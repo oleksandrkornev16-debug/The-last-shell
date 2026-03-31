@@ -2,24 +2,24 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>The LAST Shell</title>
+    <title>The LAST Shell - TP Mode</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; user-select: none; }
         #menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #050505; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; border: 4px solid #400; }
         .btn { background: #600; border: 2px solid #f00; color: white; padding: 20px 80px; cursor: pointer; font-size: 30px; font-weight: bold; transition: 0.2s; margin: 20px; }
         .btn:hover { background: #f00; box-shadow: 0 0 30px #f00; }
         
-        .mobile-toggle { color: #aaa; font-size: 20px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .mobile-toggle input { width: 25px; height: 25px; }
+        .tp-toggle { color: #aaa; font-size: 20px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .tp-toggle input { width: 25px; height: 25px; }
 
         #ui { position: absolute; top: 20px; left: 20px; color: #f00; font-size: 14px; z-index: 10; display: none; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #444; pointer-events: none; }
         #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid lime; transform: translate(-50%, -50%); display: none; z-index: 10; border-radius: 50%; }
         #jumpscare { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; display: none; z-index: 200; justify-content: center; align-items: center; font-size: 200px; }
 
-        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,0,0,0.3); border-radius: 50%; display: none; z-index: 50; }
-        #joystick-stick { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255,0,0,0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-        
-        #fire-btn { position: absolute; bottom: 60px; right: 60px; width: 100px; height: 100px; background: rgba(255,0,0,0.6); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; align-items: center; justify-content: center; cursor: pointer; }
+        /* Елементи ТР */
+        #joystick-zone { position: absolute; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,0,0,0.3); border-radius: 50%; display: none; z-index: 50; pointer-events: none; }
+        #joystick-stick { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255,0,0,0.5); border-radius: 50%; transform: translate(-50%, -50%); }
+        #fire-btn { position: absolute; bottom: 60px; right: 60px; width: 110px; height: 110px; background: rgba(255,0,0,0.6); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; text-shadow: 0 0 5px black; }
     </style>
 </head>
 <body>
@@ -32,14 +32,14 @@
 
 <div id="menu">
     <h1 style="color: red; font-size: 50px; text-shadow: 0 0 20px red; margin-bottom: 20px;">The LAST Shell</h1>
-    <label class="mobile-toggle">
-        <input type="checkbox" id="mobileCheck"> ТЕЛЕФОННИЙ ГЕЙМПЛЕЙ
+    <label class="tp-toggle">
+        <input type="checkbox" id="tpCheck"> ТЕЛЕФОННИЙ РЕЖИМ (ТР)
     </label>
     <button class="btn" onclick="startGame()">PLAY</button>
 </div>
 
 <div id="joystick-zone"><div id="joystick-stick"></div></div>
-<div id="fire-btn">FIRE</div>
+<div id="fire-btn">SHOOT</div>
 <div id="jumpscare">💀</div>
 
 <script type="importmap">
@@ -50,11 +50,12 @@
     import * as THREE from 'three';
 
     let scene, camera, renderer, monster, shotgunItem, gunMesh, walls = [];
-    let isStarted = false, hasGun = false, isDead = false, isMobile = false;
+    let isStarted = false, hasGun = false, isDead = false, isTP = false;
     const keys = {};
 
+    // Керування ТР
     let joyActive = false, joyStart = {x:0, y:0}, joyMove = {x:0, y:0};
-    let lastTouch = {x:0, y:0};
+    let lookActive = false, lastLook = {x:0, y:0};
 
     window.addEventListener('keydown', (e) => { keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -77,7 +78,7 @@
         scene.fog = new THREE.Fog(0x000000, 1, 22);
         camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.1, 0); 
-        camera.rotation.order = 'YXZ'; // Важливо для рівного огляду
+        camera.rotation.order = 'YXZ';
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -115,63 +116,65 @@
         monster.position.set(-110, 1.5, -110);
         scene.add(monster);
 
-        // --- ЛОГІКА ОГЛЯДУ (РІВНА) ---
-        window.addEventListener('mousemove', (e) => {
-            if (!isStarted || isDead) return;
-            // Використовуємо movementX для плавності
-            camera.rotation.y -= (e.movementX || 0) * 0.0022;
-            camera.rotation.x -= (e.movementY || 0) * 0.0022;
-            camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
-        });
-
-        // Тач-логіка (розділена на зони)
-        window.addEventListener('touchstart', (e) => {
-            const x = e.touches[0].clientX;
-            const y = e.touches[0].clientY;
-            if (x < window.innerWidth / 2) {
+        // --- ЛОГІКА ТР (МИШКА І ТАЧ) ---
+        const handleStart = (x, y) => {
+            if(!isStarted || isDead) return;
+            if(x < window.innerWidth / 2) {
                 joyActive = true;
                 joyStart = {x, y};
-                document.getElementById('joystick-zone').style.display = 'block';
-                document.getElementById('joystick-zone').style.left = (x - 60) + 'px';
-                document.getElementById('joystick-zone').style.top = (y - 60) + 'px';
+                const jz = document.getElementById('joystick-zone');
+                jz.style.display = 'block';
+                jz.style.left = (x - 60) + 'px';
+                jz.style.top = (y - 60) + 'px';
             } else {
-                lastTouch = {x, y};
+                lookActive = true;
+                lastLook = {x, y};
+            }
+        };
+
+        const handleMove = (x, y) => {
+            if(joyActive) {
+                let dx = x - joyStart.x;
+                let dy = y - joyStart.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if(dist > 45) { dx *= 45/dist; dy *= 45/dist; }
+                document.getElementById('joystick-stick').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                joyMove = {x: dx/45, y: dy/45};
+            }
+            if(lookActive) {
+                const dx = (x - lastLook.x) * 0.005;
+                const dy = (y - lastLook.y) * 0.005;
+                camera.rotation.y -= dx;
+                camera.rotation.x -= dy;
+                camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
+                lastLook = {x, y};
+            }
+        };
+
+        const handleEnd = () => {
+            joyActive = false; lookActive = false;
+            joyMove = {x:0, y:0};
+            document.getElementById('joystick-zone').style.display = 'none';
+        };
+
+        // Події мишки (для ТР)
+        window.addEventListener('mousedown', (e) => { if(isTP) handleStart(e.clientX, e.clientY); });
+        window.addEventListener('mousemove', (e) => { 
+            if(isTP) handleMove(e.clientX, e.clientY); 
+            else if(isStarted && !isDead) { // Звичайний огляд ПК
+                camera.rotation.y -= e.movementX * 0.0022;
+                camera.rotation.x -= e.movementY * 0.0022;
+                camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
             }
         });
+        window.addEventListener('mouseup', handleEnd);
 
-        window.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            for (let i = 0; i < e.touches.length; i++) {
-                const x = e.touches[i].clientX;
-                const y = e.touches[i].clientY;
-                
-                if (joyActive && x < window.innerWidth / 2) {
-                    let dx = x - joyStart.x;
-                    let dy = y - joyStart.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist > 40) { dx *= 40/dist; dy *= 40/dist; }
-                    document.getElementById('joystick-stick').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                    joyMove = {x: dx/40, y: dy/40};
-                } else if (x >= window.innerWidth / 2) {
-                    // Огляд тачем через дельту (заміна movementX)
-                    const dx = x - lastTouch.x;
-                    const dy = y - lastTouch.y;
-                    camera.rotation.y -= dx * 0.005;
-                    camera.rotation.x -= dy * 0.005; // Видали цю строку, якщо не хочеш огляд вгору/вниз на телефоні
-                    camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
-                    lastTouch = {x, y};
-                }
-            }
-        }, {passive: false});
+        // Події тач (справжній телефон)
+        window.addEventListener('touchstart', (e) => { handleStart(e.touches[0].clientX, e.touches[0].clientY); });
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+        window.addEventListener('touchend', handleEnd);
 
-        window.addEventListener('touchend', (e) => {
-            if (e.touches.length === 0) {
-                joyActive = false;
-                joyMove = {x:0, y:0};
-                document.getElementById('joystick-zone').style.display = 'none';
-            }
-        });
-
+        // Стрільба
         const shoot = () => {
             if (!hasGun || isDead) return;
             const ray = new THREE.Raycaster();
@@ -183,16 +186,16 @@
                 window.location.href = "https://scratch.mit.edu/projects/1297429937/";
             }
         };
-
-        window.addEventListener('mousedown', () => { if(!isMobile && isStarted) shoot(); });
-        document.getElementById('fire-btn').addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); });
+        document.getElementById('fire-btn').addEventListener('mousedown', (e) => { e.stopPropagation(); shoot(); });
+        document.getElementById('fire-btn').addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); shoot(); });
+        window.addEventListener('click', () => { if(!isTP && hasGun && isStarted) shoot(); });
     }
 
     window.startGame = () => {
-        isMobile = document.getElementById('mobileCheck').checked;
+        isTP = document.getElementById('tpCheck').checked;
         document.getElementById('menu').style.display = 'none';
         document.getElementById('ui').style.display = 'block';
-        if(!isMobile) document.body.requestPointerLock();
+        if(!isTP) document.body.requestPointerLock();
         init();
         isStarted = true;
         animate();
@@ -208,11 +211,13 @@
         const side = new THREE.Vector3(-dir.z, 0, dir.x);
         const oldPos = camera.position.clone();
 
+        // Клавіатура
         if (keys['KeyW']) camera.position.addScaledVector(dir, moveSpeed);
         if (keys['KeyS']) camera.position.addScaledVector(dir, -moveSpeed);
         if (keys['KeyA']) camera.position.addScaledVector(side, -moveSpeed);
         if (keys['KeyD']) camera.position.addScaledVector(side, moveSpeed);
 
+        // Джойстик (ТР)
         if (joyActive) {
             camera.position.addScaledVector(dir, -joyMove.y * moveSpeed);
             camera.position.addScaledVector(side, joyMove.x * moveSpeed);
@@ -224,6 +229,7 @@
         document.getElementById('posX').innerText = Math.round(camera.position.x);
         document.getElementById('posZ').innerText = Math.round(camera.position.z);
 
+        // Монстр
         const toP = new THREE.Vector3().subVectors(camera.position, monster.position).normalize();
         let mMove = toP.clone();
         const mRay = new THREE.Raycaster(monster.position, toP);
@@ -233,10 +239,11 @@
         monster.position.addScaledVector(mMove, 0.15);
         monster.lookAt(camera.position.x, 1.5, camera.position.z);
 
+        // Підбір зброї
         if (!hasGun && camera.position.distanceTo(shotgunItem.position) < 2.5) {
             hasGun = true; scene.remove(shotgunItem); gunMesh.visible = true;
             document.getElementById('crosshair').style.display = 'block';
-            if(isMobile) document.getElementById('fire-btn').style.display = 'flex';
+            if(isTP) document.getElementById('fire-btn').style.display = 'flex';
         }
 
         const d = camera.position.distanceTo(monster.position);
