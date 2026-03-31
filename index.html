@@ -2,26 +2,50 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>The LAST Shell - TP FIXED</title>
+    <title>The LAST Shell - JOYSTICK RETURNED</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; user-select: none; }
-        #menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #050505; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; border: 4px solid #400; }
-        .btn { background: #600; border: 2px solid #f00; color: white; padding: 20px 80px; cursor: pointer; font-size: 30px; font-weight: bold; transition: 0.2s; margin: 20px; }
+        
+        #menu { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #050505; color: white; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 1000; 
+            border: 4px solid #400; box-sizing: border-box;
+        }
+        
+        .btn { 
+            background: #600; border: 2px solid #f00; color: white; 
+            padding: 20px 80px; cursor: pointer; font-size: 30px; 
+            font-weight: bold; transition: 0.2s; margin: 20px;
+            pointer-events: auto;
+        }
         .btn:hover { background: #f00; box-shadow: 0 0 30px #f00; }
         
-        .mobile-toggle { color: #aaa; font-size: 20px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .mobile-toggle { color: #aaa; font-size: 20px; display: flex; align-items: center; gap: 10px; cursor: pointer; pointer-events: auto; }
         .mobile-toggle input { width: 25px; height: 25px; }
 
         #ui { position: absolute; top: 20px; left: 20px; color: #f00; font-size: 14px; z-index: 10; display: none; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #444; pointer-events: none; }
         #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid lime; transform: translate(-50%, -50%); display: none; z-index: 10; border-radius: 50%; }
-        #jumpscare { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; display: none; z-index: 200; justify-content: center; align-items: center; font-size: 200px; }
+        #jumpscare { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; display: none; z-index: 2000; justify-content: center; align-items: center; font-size: 200px; }
 
-        /* Джойстик */
-        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,0,0,0.3); border-radius: 50%; display: none; z-index: 50; pointer-events: none; }
-        #joystick-stick { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255,0,0,0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        /* Стилі джойстика */
+        #joystick-zone { 
+            position: absolute; width: 120px; height: 120px; 
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,0,0,0.3); 
+            border-radius: 50%; display: none; z-index: 50; pointer-events: none; 
+        }
+        #joystick-stick { 
+            position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; 
+            background: rgba(255,0,0,0.5); border-radius: 50%; 
+            transform: translate(-50%, -50%); 
+        }
         
-        /* Кнопка вогню */
-        #fire-btn { position: absolute; bottom: 60px; right: 60px; width: 100px; height: 100px; background: rgba(255,0,0,0.6); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; align-items: center; justify-content: center; cursor: pointer; }
+        #fire-btn { 
+            position: absolute; bottom: 60px; right: 60px; width: 110px; height: 110px; 
+            background: rgba(255,0,0,0.6); border: 4px solid white; border-radius: 50%; 
+            display: none; z-index: 60; color: white; font-weight: bold; 
+            align-items: center; justify-content: center; font-size: 20px; cursor: pointer; 
+        }
     </style>
 </head>
 <body>
@@ -35,9 +59,9 @@
 <div id="menu">
     <h1 style="color: red; font-size: 50px; text-shadow: 0 0 20px red; margin-bottom: 20px;">The LAST Shell</h1>
     <label class="mobile-toggle">
-        <input type="checkbox" id="tpCheck"> ТЕЛЕФОННИЙ ГЕЙМПЛЕЙ
+        <input type="checkbox" id="tpCheck"> ТЕЛЕФОННИЙ ГЕЙМПЛЕЙ (ТР)
     </label>
-    <button class="btn" onclick="startGame()">PLAY</button>
+    <button class="btn" id="startBtn">PLAY</button>
 </div>
 
 <div id="joystick-zone"><div id="joystick-stick"></div></div>
@@ -52,14 +76,12 @@
     import * as THREE from 'three';
 
     let scene, camera, renderer, monster, shotgunItem, gunMesh, walls = [];
-    let isStarted = false, hasGun = false, isDead = false, isMobile = false;
+    let isStarted = false, hasGun = false, isDead = false, isTP = false;
     const keys = {};
 
-    // Керування (Мультитач)
-    let joyTouchId = null;
-    let lookTouchId = null;
-    let joyStart = {x:0, y:0}, joyMove = {x:0, y:0};
-    let lastLook = {x:0, y:0};
+    // Керування ТР
+    let joyTouchId = null, lookTouchId = null;
+    let joyStart = {x:0, y:0}, joyMove = {x:0, y:0}, lastLook = {x:0, y:0};
 
     window.addEventListener('keydown', (e) => { keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -82,7 +104,7 @@
         scene.fog = new THREE.Fog(0x000000, 1, 22);
         camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.1, 0); 
-        camera.rotation.order = 'YXZ'; // Для рівного огляду
+        camera.rotation.order = 'YXZ';
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -120,70 +142,74 @@
         monster.position.set(-110, 1.5, -110);
         scene.add(monster);
 
-        // --- ЛОГІКА МУЛЬТИТАЧУ (Огляд і Джойстик окремо) ---
-        window.addEventListener('touchstart', (e) => {
+        // --- ЛОГІКА ТР (Мультитач) ---
+        const handleDown = (x, y, id) => {
             if(!isStarted || isDead) return;
-            for(let t of e.changedTouches) {
-                if(t.clientX < window.innerWidth / 2 && joyTouchId === null) {
-                    // Ліва частина - джойстик
-                    joyTouchId = t.identifier;
-                    joyStart = {x: t.clientX, y: t.clientY};
-                    document.getElementById('joystick-zone').style.display = 'block';
-                    document.getElementById('joystick-zone').style.left = (t.clientX - 60) + 'px';
-                    document.getElementById('joystick-zone').style.top = (t.clientY - 60) + 'px';
-                } else if (t.clientX >= window.innerWidth / 2 && lookTouchId === null) {
-                    // Права частина - огляд
-                    lookTouchId = t.identifier;
-                    lastLook = {x: t.clientX, y: t.clientY};
-                }
+            if(x < window.innerWidth / 2 && joyTouchId === null) {
+                joyTouchId = id;
+                joyStart = {x, y};
+                const jz = document.getElementById('joystick-zone');
+                jz.style.display = 'block';
+                jz.style.left = (x - 60) + 'px';
+                jz.style.top = (y - 60) + 'px';
+            } else if (x >= window.innerWidth / 2 && lookTouchId === null) {
+                lookTouchId = id;
+                lastLook = {x, y};
             }
-        });
+        };
 
-        window.addEventListener('touchmove', (e) => {
-            if(!isStarted || isDead) return;
-            e.preventDefault();
-            for(let t of e.touches) {
-                if(t.identifier === joyTouchId) {
-                    let dx = t.clientX - joyStart.x;
-                    let dy = t.clientY - joyStart.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if(dist > 40) { dx *= 40/dist; dy *= 40/dist; }
-                    document.getElementById('joystick-stick').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                    joyMove = {x: dx/40, y: dy/40};
-                }
-                if(t.identifier === lookTouchId) {
-                    const dx = t.clientX - lastLook.x;
-                    const dy = t.clientY - lastLook.y;
-                    camera.rotation.y -= dx * 0.005;
-                    camera.rotation.x -= dy * 0.005; // Вгору-вниз
-                    camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
-                    lastLook = {x: t.clientX, y: t.clientY};
-                }
+        const handleMove = (x, y, id) => {
+            if(id === joyTouchId) {
+                let dx = x - joyStart.x;
+                let dy = y - joyStart.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if(dist > 45) { dx *= 45/dist; dy *= 45/dist; }
+                document.getElementById('joystick-stick').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                joyMove = {x: dx/45, y: dy/45};
             }
-        }, {passive:false});
-
-        window.addEventListener('touchend', (e) => {
-            for(let t of e.changedTouches) {
-                if(t.identifier === joyTouchId) {
-                    joyTouchId = null;
-                    joyMove = {x:0, y:0};
-                    document.getElementById('joystick-zone').style.display = 'none';
-                }
-                if(t.identifier === lookTouchId) {
-                    lookTouchId = null;
-                }
+            if(id === lookTouchId) {
+                const dx = (x - lastLook.x) * 0.005;
+                const dy = (y - lastLook.y) * 0.005;
+                camera.rotation.y -= dx;
+                camera.rotation.x -= dy;
+                camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
+                lastLook = {x, y};
             }
-        });
+        };
 
-        // Мишка (для ПК, не ТР)
+        const handleUp = (id) => {
+            if(id === joyTouchId) {
+                joyTouchId = null; joyMove = {x:0, y:0};
+                document.getElementById('joystick-zone').style.display = 'none';
+            }
+            if(id === lookTouchId) lookTouchId = null;
+        };
+
+        // Мишка для ТР (тестування на ПК)
+        window.addEventListener('mousedown', (e) => { if(isTP) handleDown(e.clientX, e.clientY, 'mouse'); });
         window.addEventListener('mousemove', (e) => { 
-            if(!isMobile && isStarted && !isDead) {
-                camera.rotation.y -= e.movementX * 0.0022;
-                camera.rotation.x -= e.movementY * 0.0022;
+            if(isTP) handleMove(e.clientX, e.clientY, 'mouse'); 
+            else if(isStarted && !isDead && document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
                 camera.rotation.x = Math.max(-1.4, Math.min(1.4, camera.rotation.x));
             }
         });
+        window.addEventListener('mouseup', () => { if(isTP) handleUp('mouse'); });
 
+        // Тач для телефона
+        window.addEventListener('touchstart', (e) => {
+            for(let t of e.changedTouches) handleDown(t.clientX, t.clientY, t.identifier);
+        });
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for(let t of e.touches) handleMove(t.clientX, t.clientY, t.identifier);
+        }, {passive: false});
+        window.addEventListener('touchend', (e) => {
+            for(let t of e.changedTouches) handleUp(t.identifier);
+        });
+
+        // Стрільба
         const shoot = () => {
             if (!hasGun || isDead) return;
             const ray = new THREE.Raycaster();
@@ -195,27 +221,28 @@
                 window.location.href = "https://scratch.mit.edu/projects/1297429937/";
             }
         };
-        document.getElementById('fire-btn').addEventListener('click', shoot);
-        document.getElementById('fire-btn').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); shoot(); });
-        window.addEventListener('mousedown', () => { if(!isMobile && hasGun && isStarted) shoot(); });
+        document.getElementById('fire-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); e.stopPropagation(); shoot(); 
+        });
+        window.addEventListener('mousedown', () => { if(!isTP && hasGun && isStarted) shoot(); });
     }
 
-    window.startGame = () => {
-        // Повний екран
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-        }
+    // Старт гри
+    document.getElementById('startBtn').addEventListener('click', () => {
+        isTP = document.getElementById('tpCheck').checked;
+        
+        // Fullscreen
+        const de = document.documentElement;
+        if (de.requestFullscreen) de.requestFullscreen();
+        else if (de.webkitRequestFullscreen) de.webkitRequestFullscreen();
 
-        isMobile = document.getElementById('mobileCheck').checked;
         document.getElementById('menu').style.display = 'none';
         document.getElementById('ui').style.display = 'block';
-        if(!isMobile) document.body.requestPointerLock();
+        if(!isTP) document.body.requestPointerLock();
         init();
         isStarted = true;
         animate();
-    };
+    });
 
     function animate() {
         if (isDead) return;
@@ -243,19 +270,13 @@
         document.getElementById('posX').innerText = Math.round(camera.position.x);
         document.getElementById('posZ').innerText = Math.round(camera.position.z);
 
-        const toP = new THREE.Vector3().subVectors(camera.position, monster.position).normalize();
-        let mMove = toP.clone();
-        const mRay = new THREE.Raycaster(monster.position, toP);
-        const hit = mRay.intersectObjects(scene.children);
-        if (hit.length > 0 && hit[0].object !== monster && hit[0].distance < 4.5) mMove.set(-toP.z, 0, toP.x);
-        
-        monster.position.addScaledVector(mMove, 0.15);
+        monster.position.addScaledVector(new THREE.Vector3().subVectors(camera.position, monster.position).normalize(), 0.15);
         monster.lookAt(camera.position.x, 1.5, camera.position.z);
 
         if (!hasGun && camera.position.distanceTo(shotgunItem.position) < 2.5) {
             hasGun = true; scene.remove(shotgunItem); gunMesh.visible = true;
             document.getElementById('crosshair').style.display = 'block';
-            if(isMobile) document.getElementById('fire-btn').style.display = 'flex';
+            if(isTP) document.getElementById('fire-btn').style.display = 'flex';
         }
 
         const d = camera.position.distanceTo(monster.position);
@@ -267,15 +288,6 @@
         }
         renderer.render(scene, camera);
     }
-
-    // Ресайз при зміні орієнтації
-    window.addEventListener('resize', () => {
-        if(camera) {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-    });
 </script>
 </body>
 </html>
